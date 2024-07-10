@@ -17,13 +17,28 @@ from langchain_anthropic import ChatAnthropic
 from langchain_community.tools import ShellTool
 from langgraph.prebuilt import create_react_agent
 
+if "use_sonnet" not in st.session_state:
+    st.session_state.use_sonnet = False
+
+col1, col2 = st.columns(2)
+
 # Initialize show_system_prompt in session state
 if "show_system_prompt" not in st.session_state:
     st.session_state.show_system_prompt = False
 
-# Add a button to toggle the visibility of the system prompt
-if st.button("Show System Prompt" if not st.session_state.show_system_prompt else "Hide System Prompt"):
-    st.session_state.show_system_prompt = not st.session_state.show_system_prompt
+with col1:
+    if st.button("Show System Prompt" if not st.session_state.show_system_prompt else "Hide System Prompt"):
+        st.session_state.show_system_prompt = not st.session_state.show_system_prompt
+
+with col2:
+    if st.button("Use Sonnet 3.5"):
+        st.session_state.use_sonnet = True
+
+if st.session_state.use_sonnet:
+    sonnet_api_key = st.text_input("Input Anthropic API Key for Sonnet 3.5", type="password")
+    if sonnet_api_key:
+        os.environ["ANTHROPIC_API_KEY"] = sonnet_api_key
+
 
 # Show title and description.
 st.title("Coder for NextJS Templates")
@@ -158,7 +173,10 @@ else:
     class AgentState(TypedDict):
         messages: Annotated[List[BaseMessage], operator.add]
 
-    llm = ChatAnthropic(temperature=0, model_name="claude-3-haiku-20240307")
+    if st.session_state.use_sonnet and "ANTHROPIC_API_KEY" in os.environ:
+        llm = ChatAnthropic(temperature=0, model_name="claude-3-sonnet-20240307")
+    else:
+        llm = ChatAnthropic(temperature=0, model_name="claude-3-haiku-20240307")
 
     system_prompt_template = """You are an AI specialized in managing and analyzing a GitHub repository for a Next.js blog website.
     Your task is to answer user queries about the repository or execute tasks for modifying it.
@@ -269,12 +287,20 @@ else:
 
         # Recreate the graph with the updated system prompt
         global graph
+        if st.session_state.use_sonnet and "ANTHROPIC_API_KEY" in os.environ:
+            new_llm = ChatAnthropic(temperature=0, model_name="claude-3-sonnet-20240307")
+        else:
+            new_llm = ChatAnthropic(temperature=0, model_name="claude-3-haiku-20240307")
+        
         graph = create_react_agent(
-            llm,
+            new_llm,
             tools=tools,
             messages_modifier=st.session_state.system_prompt,
             checkpointer=memory
         )
+
+    if st.session_state.use_sonnet and "ANTHROPIC_API_KEY" in os.environ:
+        refresh_repo_data()
 
     # Automatically refresh repo data when keys are provided
     if "REPO_CONTENT" not in st.session_state:
