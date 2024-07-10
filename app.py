@@ -17,28 +17,6 @@ from langchain_anthropic import ChatAnthropic
 from langchain_community.tools import ShellTool
 from langgraph.prebuilt import create_react_agent
 
-if "use_sonnet" not in st.session_state:
-    st.session_state.use_sonnet = False
-
-col1, col2 = st.columns(2)
-
-# Initialize show_system_prompt in session state
-if "show_system_prompt" not in st.session_state:
-    st.session_state.show_system_prompt = False
-
-with col1:
-    if st.button("Show System Prompt" if not st.session_state.show_system_prompt else "Hide System Prompt"):
-        st.session_state.show_system_prompt = not st.session_state.show_system_prompt
-
-with col2:
-    if st.button("Use Sonnet 3.5"):
-        st.session_state.use_sonnet = True
-
-if st.session_state.use_sonnet:
-    sonnet_api_key = st.text_input("Input Anthropic API Key for Sonnet 3.5", type="password")
-    if sonnet_api_key:
-        os.environ["ANTHROPIC_API_KEY"] = sonnet_api_key
-
 
 # Show title and description.
 st.title("Coder for NextJS Templates")
@@ -65,11 +43,33 @@ github_token = st.text_input("Enter your Github Token", type="password")
 anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
 
 if not (github_repo_url and github_token and anthropic_api_key):
-    st.info("Please add your Github Repo URL, Github Token, and Anthropic API key to continue.", icon="🗝️")
+    st.info("Please add your Github Repo URL and Github Personal Token to continue.", icon="🗝️")
 else:
     # Set environment variables
     os.environ["ANTHROPIC_API_KEY"] = anthropic_api_key
     os.environ["GITHUB_TOKEN"] = github_token
+
+    # Add the buttons after the inputs are provided
+    if "use_sonnet" not in st.session_state:
+        st.session_state.use_sonnet = False
+
+    if "show_system_prompt" not in st.session_state:
+        st.session_state.show_system_prompt = False
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button("Show System Prompt" if not st.session_state.show_system_prompt else "Hide System Prompt"):
+            st.session_state.show_system_prompt = not st.session_state.show_system_prompt
+
+    with col2:
+        if st.button("Use Sonnet 3.5"):
+            st.session_state.use_sonnet = True
+
+    if st.session_state.use_sonnet:
+        sonnet_api_key = st.text_input("Input Anthropic API Key for Sonnet 3.5", type="password")
+        if sonnet_api_key:
+            os.environ["ANTHROPIC_API_KEY"] = sonnet_api_key
 
     # Parse the repository URL to extract user_name and REPO_NAME
     parsed_url = urlparse(github_repo_url)
@@ -367,7 +367,7 @@ else:
 
     # Create a chat input field to allow the user to enter a message. This will display
     # automatically at the bottom of the page.
-    if prompt := st.chat_input("What is up?"):
+    if prompt := st.chat_input("Give me a Task!"):
 
         # Store and display the current prompt.
         st.session_state.messages.append({"role": "user", "content": prompt})
