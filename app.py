@@ -29,6 +29,7 @@ st.write(
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
 os.environ["LANGCHAIN_ENDPOINT"] = "https://api.smith.langchain.com"
 os.environ["LANGCHAIN_PROJECT"] = "Github-Agent"
+os.environ["LANGCHAIN_API_KEY"] = os.getenv("LANGCHAIN_API_KEY")
 
 github_repo_url = st.text_input("Github Repo URL (e.g., https://github.com/user/repo)")
 
