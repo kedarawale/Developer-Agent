@@ -20,9 +20,9 @@ from langgraph.prebuilt import create_react_agent
 
 # Show title and description.
 st.title("Coder for NextJS Templates")
-st.write(
+st.markdown(
     "This chatbot connects to a Next.JS Github Repository to answer questions and modify code "
-    "given the user's prompt. Please input your repo url and github token to allow the AI to connect, then query it by asking questions or requesting feature changes!"
+    "given the user's prompt. Please input your repo url and github token to allow the AI to connect, then query it by asking questions or requesting feature changes! Watch video about this app [here](https://www.youtube.com/watch?v=A3XCfAVWrH4&t=17s)"
 )
 
 # Ask user for their Github Repo URL, Github Token, and Anthropic API key via `st.text_input`.
