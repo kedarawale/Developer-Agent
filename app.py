@@ -175,7 +175,7 @@ else:
         messages: Annotated[List[BaseMessage], operator.add]
 
     if st.session_state.use_sonnet and "ANTHROPIC_API_KEY" in os.environ:
-        llm = ChatAnthropic(temperature=0, model_name="claude-3-sonnet-20240307")
+        llm = ChatAnthropic(temperature=0, model_name="claude-3-5-sonnet-20240620")
     else:
         llm = ChatAnthropic(temperature=0, model_name="claude-3-haiku-20240307")
 
@@ -289,7 +289,7 @@ else:
         # Recreate the graph with the updated system prompt
         global graph
         if st.session_state.use_sonnet and "ANTHROPIC_API_KEY" in os.environ:
-            new_llm = ChatAnthropic(temperature=0, model_name="claude-3-sonnet-20240307")
+            new_llm = ChatAnthropic(temperature=0, model_name="claude-3-5-sonnet-20240620")
         else:
             new_llm = ChatAnthropic(temperature=0, model_name="claude-3-haiku-20240307")
         
