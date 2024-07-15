@@ -17,6 +17,32 @@ from langchain_anthropic import ChatAnthropic
 from langchain_community.tools import ShellTool
 from langgraph.prebuilt import create_react_agent
 
+st.markdown("""
+<style>
+    .stCodeBlock {
+        background-color: #f0f0f0;
+        border: 1px solid #d0d0d0;
+        border-radius: 5px;
+        padding: 10px;
+        margin-bottom: 10px;
+    }
+    .stCodeBlock pre {
+        margin: 0;
+    }
+    .copyButton {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        padding: 5px 10px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 
 # Show title and description.
 # Add a radio button for mode selection
@@ -349,7 +375,17 @@ else:
         messages_modifier=st.session_state.qa_system_prompt,
         checkpointer=memory
     )
+
+    def format_ai_response(response):
+        # Function to replace code blocks with formatted versions
+        def replace_code_block(match):
+            code = match.group(1).strip()
+            return f"\n```python\n{code}\n```\n"
     
+        # Replace code blocks
+        formatted_response = re.sub(r'```(.*?)```', replace_code_block, response, flags=re.DOTALL)
+        
+        return formatted_response
     async def run_github_editor(query: str, thread_id: str = "default"):
         inputs = {"messages": [HumanMessage(content=query)]}
         config = {
@@ -360,6 +396,7 @@ else:
         st.write(f"Human: {query}\n")
     
         current_thought = ""
+        full_response = ""
     
         graph = task_graph if mode == "Task" else qa_graph
     
@@ -374,15 +411,21 @@ else:
                     if isinstance(content, list) and content and isinstance(content[0], dict):
                         text = content[0].get('text', '')
                         current_thought += text
+                        full_response += text
                         if text.endswith(('.', '?', '!')):
                             st.write(current_thought.strip())
                             current_thought = ""
                     else:
+                        full_response += content
                         st.write(content, end="")
             elif kind == "on_tool_start" and mode == "Task":
                 st.write(f"\nUsing tool: {event['name']}")
             elif kind == "on_tool_end" and mode == "Task":
                 st.write(f"Tool result: {event['data']['output']}\n")
+    
+        # Format and display the full response with proper code block formatting
+        formatted_response = format_ai_response(full_response)
+        st.markdown(formatted_response)
 
     # Create a session state variable to store the chat messages. This ensures that the
     # messages persist across reruns.
