@@ -45,6 +45,8 @@ github_token = st.text_input("Enter your Github Token", type="password")
 
 anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
 
+graph_tools = []
+
 if not (github_repo_url and github_token and anthropic_api_key):
     st.info("Please add your Github Repo URL and Github Personal Token to continue.", icon="🗝️")
 else:
@@ -280,14 +282,19 @@ else:
                     stack.append((item['path'], item['url']))
 
         return result
-
+    # Instead, add this block after the radio button for mode selection:
+    if "task_system_prompt" not in st.session_state or "qa_system_prompt" not in st.session_state:
+        st.session_state.task_system_prompt = task_system_prompt_template.format(REPO_CONTENT="")
+        st.session_state.qa_system_prompt = qa_system_prompt_template.format(REPO_CONTENT="")
+    
+    # Modify the refresh_repo_data() function:
     def refresh_repo_data():
         repo_contents = process_repo(github_repo_url)
         repo_contents_json = json.dumps(repo_contents, ensure_ascii=False, indent=2)
         st.session_state.REPO_CONTENT = repo_contents_json
         st.success("Repository content refreshed successfully.")
     
-        # Update the system prompts with the new repo content
+        # Update both system prompts with the new repo content
         st.session_state.task_system_prompt = task_system_prompt_template.format(REPO_CONTENT=st.session_state.REPO_CONTENT)
         st.session_state.qa_system_prompt = qa_system_prompt_template.format(REPO_CONTENT=st.session_state.REPO_CONTENT)
     
@@ -304,7 +311,6 @@ else:
             messages_modifier=st.session_state.task_system_prompt,
             checkpointer=memory
         )
-        graph_tools = []
         qa_graph = create_react_agent(
             new_llm,
             tools = graph_tools,
@@ -319,11 +325,17 @@ else:
     if "REPO_CONTENT" not in st.session_state:
         refresh_repo_data()
 
-    # Initialize system_prompt in session state
-    if "system_prompt" not in st.session_state:
-        st.session_state.system_prompt = system_prompt_template.format(REPO_CONTENT=st.session_state.REPO_CONTENT)
-
-    # Create separate graphs for Task and Q/A modes
+    # Modify the code that displays the current system prompt:
+    if st.session_state.show_system_prompt:
+        current_prompt = st.session_state.task_system_prompt if mode == "Task" else st.session_state.qa_system_prompt
+        st.text_area("Current System Prompt", current_prompt, height=300)
+    
+    # Update the graph initialization:
+    if st.session_state.use_sonnet and "ANTHROPIC_API_KEY" in os.environ:
+        llm = ChatAnthropic(temperature=0, model_name="claude-3-5-sonnet-20240620")
+    else:
+        llm = ChatAnthropic(temperature=0, model_name="claude-3-haiku-20240307")
+    
     task_graph = create_react_agent(
         llm,
         tools=tools,
@@ -333,7 +345,9 @@ else:
     
     qa_graph = create_react_agent(
         llm,
-        messages_modifier=st.session_state.qa_system_prompt
+        tools=graph_tools,
+        messages_modifier=st.session_state.qa_system_prompt,
+        checkpointer=memory
     )
     
     async def run_github_editor(query: str, thread_id: str = "default"):
