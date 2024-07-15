@@ -19,6 +19,8 @@ from langgraph.prebuilt import create_react_agent
 
 
 # Show title and description.
+# Add a radio button for mode selection
+mode = st.radio("Select Mode", ["Q/A", "Task"])
 st.title("Coder for NextJS Templates")
 st.markdown(
     "This chatbot connects to a Next.JS Github Repository to answer questions and modify code "
@@ -179,17 +181,14 @@ else:
     else:
         llm = ChatAnthropic(temperature=0, model_name="claude-3-haiku-20240307")
 
-    system_prompt_template = """You are an AI specialized in managing and analyzing a GitHub repository for a Next.js blog website.
+    # Modify the system prompts
+    task_system_prompt_template = """You are an AI specialized in managing and analyzing a GitHub repository for a Next.js blog website.
     Your task is to answer user queries about the repository or execute tasks for modifying it.
-
     Before performing any operation, always use the force_clone_repo tool to ensure you have the latest version of the repository.
-
     Here is all of the code from the repository as well as the file paths for context of how the repo is structured: {REPO_CONTENT}
-
     Given this context, follow this prompt in completing the user's task:
     For user questions, provide direct answers based on the current state of the repository.
     For tasks given by the user, use the available tools and your knowledge of the repo to make necessary changes to the repository.
-
     When making changes, remember to force clone the repository first, make the changes, and then commit and push the changes.
     Available tools:
     1. shell_tool: Execute shell commands
@@ -198,8 +197,13 @@ else:
     4. commit_and_push: Commit and push changes to the repository
     5. read_file: Read content from a specific file in the repository
     When using the write_file tool, always provide both the file_path and the content as separate arguments.
-
     Respond to the human's messages and use tools when necessary to complete tasks. Take a deep breath and think through the task step by step:"""
+    
+    qa_system_prompt_template = """You are an AI specialized in analyzing a GitHub repository for a Next.js blog website.
+    Your task is to answer user queries about the repository based on the provided content.
+    Here is all of the code from the repository as well as the file paths for context of how the repo is structured: {REPO_CONTENT}
+    Given this context, provide direct answers to user questions based on the current state of the repository.
+    Take a deep breath and think through the question step by step before answering:"""
 
     from langgraph.checkpoint import MemorySaver
 
@@ -282,22 +286,28 @@ else:
         repo_contents_json = json.dumps(repo_contents, ensure_ascii=False, indent=2)
         st.session_state.REPO_CONTENT = repo_contents_json
         st.success("Repository content refreshed successfully.")
-
-        # Update the system prompt with the new repo content
-        st.session_state.system_prompt = system_prompt_template.format(REPO_CONTENT=st.session_state.REPO_CONTENT)
-
-        # Recreate the graph with the updated system prompt
-        global graph
+    
+        # Update the system prompts with the new repo content
+        st.session_state.task_system_prompt = task_system_prompt_template.format(REPO_CONTENT=st.session_state.REPO_CONTENT)
+        st.session_state.qa_system_prompt = qa_system_prompt_template.format(REPO_CONTENT=st.session_state.REPO_CONTENT)
+    
+        # Recreate the graphs with the updated system prompts
+        global task_graph, qa_graph
         if st.session_state.use_sonnet and "ANTHROPIC_API_KEY" in os.environ:
             new_llm = ChatAnthropic(temperature=0, model_name="claude-3-5-sonnet-20240620")
         else:
             new_llm = ChatAnthropic(temperature=0, model_name="claude-3-haiku-20240307")
         
-        graph = create_react_agent(
+        task_graph = create_react_agent(
             new_llm,
             tools=tools,
-            messages_modifier=st.session_state.system_prompt,
+            messages_modifier=st.session_state.task_system_prompt,
             checkpointer=memory
+        )
+        
+        qa_graph = create_react_agent(
+            new_llm,
+            messages_modifier=st.session_state.qa_system_prompt
         )
 
     if st.session_state.use_sonnet and "ANTHROPIC_API_KEY" in os.environ:
@@ -311,26 +321,32 @@ else:
     if "system_prompt" not in st.session_state:
         st.session_state.system_prompt = system_prompt_template.format(REPO_CONTENT=st.session_state.REPO_CONTENT)
 
-    graph = create_react_agent(
+    # Create separate graphs for Task and Q/A modes
+    task_graph = create_react_agent(
         llm,
         tools=tools,
-        messages_modifier=st.session_state.system_prompt,
+        messages_modifier=st.session_state.task_system_prompt,
         checkpointer=memory
     )
-
-    from langchain_core.messages import AIMessage, ToolMessage
-
+    
+    qa_graph = create_react_agent(
+        llm,
+        messages_modifier=st.session_state.qa_system_prompt
+    )
+    
     async def run_github_editor(query: str, thread_id: str = "default"):
         inputs = {"messages": [HumanMessage(content=query)]}
         config = {
             "configurable": {"thread_id": thread_id},
-            "recursion_limit": 50  # Add this line to set the recursion limit
+            "recursion_limit": 50
         }
-
+    
         st.write(f"Human: {query}\n")
-
+    
         current_thought = ""
-
+    
+        graph = task_graph if mode == "Task" else qa_graph
+    
         async for event in graph.astream_events(inputs, config=config, version="v2"):
             kind = event["event"]
             if kind == "on_chat_model_start":
@@ -347,9 +363,9 @@ else:
                             current_thought = ""
                     else:
                         st.write(content, end="")
-            elif kind == "on_tool_start":
+            elif kind == "on_tool_start" and mode == "Task":
                 st.write(f"\nUsing tool: {event['name']}")
-            elif kind == "on_tool_end":
+            elif kind == "on_tool_end" and mode == "Task":
                 st.write(f"Tool result: {event['data']['output']}\n")
 
     # Create a session state variable to store the chat messages. This ensures that the
@@ -368,12 +384,11 @@ else:
 
     # Create a chat input field to allow the user to enter a message. This will display
     # automatically at the bottom of the page.
-    if prompt := st.chat_input("Give me a Task!"):
-
+    if prompt := st.chat_input(f"{'Ask a question' if mode == 'Q/A' else 'Give me a Task'}!"):
         # Store and display the current prompt.
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
-
+    
         # Generate a response using the custom chatbot logic.
         asyncio.run(run_github_editor(prompt))
