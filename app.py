@@ -304,10 +304,12 @@ else:
             messages_modifier=st.session_state.task_system_prompt,
             checkpointer=memory
         )
-        
+        graph_tools = []
         qa_graph = create_react_agent(
             new_llm,
-            messages_modifier=st.session_state.qa_system_prompt
+            tools = graph_tools,
+            messages_modifier=st.session_state.qa_system_prompt,
+            checkpointer=memory
         )
 
     if st.session_state.use_sonnet and "ANTHROPIC_API_KEY" in os.environ:
