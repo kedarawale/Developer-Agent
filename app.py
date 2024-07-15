@@ -381,10 +381,17 @@ else:
         # Function to replace code blocks with formatted versions
         def replace_code_block(match):
             code = match.group(1).strip()
-            return f"\n```python\n{code}\n```\n"
+            # Remove language specifier if present
+            code = re.sub(r'^(python|typescript|javascript)\n', '', code, flags=re.IGNORECASE)
+            return f"\n```\n{code}\n```\n"
     
         # Replace code blocks
         formatted_response = re.sub(r'```(.*?)```', replace_code_block, response, flags=re.DOTALL)
+        
+        # Ensure proper formatting for file paths and inline code
+        formatted_response = re.sub(r'`([^`\n]+)`', r'`\1`', formatted_response)
+        
+        return formatted_response
         
         return formatted_response
     async def run_github_editor(query: str, thread_id: str = "default"):
