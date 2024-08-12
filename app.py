@@ -26,28 +26,11 @@ st.markdown("""
         border: 1px solid #e1e4e8;
         border-radius: 6px;
         padding: 16px;
-        position: relative;
+        margin-bottom: 16px;
     }
     .stCodeBlock pre {
         margin: 0;
         padding: 0;
-        white-space: pre-wrap;
-        word-break: break-word;
-    }
-    .copyButton {
-        position: absolute;
-        top: 5px;
-        right: 5px;
-        padding: 5px 10px;
-        background-color: #0366d6;
-        color: white;
-        border: none;
-        border-radius: 3px;
-        cursor: pointer;
-        font-size: 12px;
-    }
-    .copyButton:hover {
-        background-color: #0056b3;
     }
     code {
         padding: 2px 4px;
@@ -391,34 +374,16 @@ else:
     )
 
     def format_ai_response(response):
-        def replace_code_block(match):
-            code = match.group(1).strip()
-            code = re.sub(r'^(python|typescript|javascript)\n', '', code, flags=re.IGNORECASE)
-            return f'<div class="stCodeBlock"><button class="copyButton" onclick="copyCode(this)">Copy</button><pre><code>{code}</code></pre></div>'
-    
-        formatted_response = re.sub(r'```(.*?)```', replace_code_block, response, flags=re.DOTALL)
-        formatted_response = re.sub(r'`([^`\n]+)`', r'<code>\1</code>', formatted_response)
+        # Remove any existing HTML tags that might interfere with markdown rendering
+        response = re.sub(r'<[^>]+>', '', response)
         
-        # Add JavaScript for copy functionality
-        js = """
-        <script>
-        function copyCode(button) {
-            const pre = button.nextElementSibling;
-            const code = pre.querySelector('code');
-            const range = document.createRange();
-            range.selectNode(code);
-            window.getSelection().removeAllRanges();
-            window.getSelection().addRange(range);
-            document.execCommand('copy');
-            window.getSelection().removeAllRanges();
-            button.textContent = 'Copied!';
-            setTimeout(() => {
-                button.textContent = 'Copy';
-            }, 2000);
-        }
-        </script>
-        """
-        return js + formatted_response
+        # Ensure code blocks are properly formatted for markdown
+        response = re.sub(r'```(\w+)?\n(.*?)```', r'```\1\n\2\n```', response, flags=re.DOTALL)
+        
+        # Ensure inline code is properly formatted
+        response = re.sub(r'`([^`\n]+)`', r'`\1`', response)
+        
+        return response
         
     async def run_github_editor(query: str, thread_id: str = "default"):
         inputs = {"messages": [HumanMessage(content=query)]}
@@ -429,37 +394,35 @@ else:
     
         st.write(f"Human: {query}\n")
     
-        current_thought = ""
         full_response = ""
+        response_container = st.empty()
     
         graph = task_graph if mode == "Task" else qa_graph
     
         async for event in graph.astream_events(inputs, config=config, version="v2"):
             kind = event["event"]
             if kind == "on_chat_model_start":
-                st.write("AI is thinking...")
+                response_container.write("AI is thinking...")
             elif kind == "on_chat_model_stream":
                 data = event["data"]
                 if data["chunk"].content:
                     content = data["chunk"].content
                     if isinstance(content, list) and content and isinstance(content[0], dict):
                         text = content[0].get('text', '')
-                        current_thought += text
                         full_response += text
-                        if text.endswith(('.', '?', '!')):
-                            st.write(current_thought.strip())
-                            current_thought = ""
                     else:
                         full_response += content
-                        st.write(content, end="")
+                    
+                    formatted_response = format_ai_response(full_response)
+                    response_container.markdown(formatted_response)
             elif kind == "on_tool_start" and mode == "Task":
-                st.write(f"\nUsing tool: {event['name']}")
+                response_container.write(f"\nUsing tool: {event['name']}")
             elif kind == "on_tool_end" and mode == "Task":
-                st.write(f"Tool result: {event['data']['output']}\n")
+                response_container.write(f"Tool result: {event['data']['output']}\n")
     
-        # Format and display the full response with proper code block formatting
-        formatted_response = format_ai_response(full_response)
-        st.markdown(formatted_response)
+        # Final formatted response
+        final_formatted_response = format_ai_response(full_response)
+        response_container.markdown(final_formatted_response)
 
     # Create a session state variable to store the chat messages. This ensures that the
     # messages persist across reruns.
