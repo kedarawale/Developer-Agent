@@ -19,28 +19,6 @@ from langchain_community.tools import ShellTool
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
 
-st.markdown("""
-<style>
-    .stCodeBlock {
-        background-color: #f6f8fa;
-        border: 1px solid #e1e4e8;
-        border-radius: 6px;
-        padding: 16px;
-        margin-bottom: 16px;
-    }
-    .stCodeBlock pre {
-        margin: 0;
-        padding: 0;
-    }
-    code {
-        padding: 2px 4px;
-        background-color: #f6f8fa;
-        border-radius: 3px;
-        font-family: monospace;
-    }
-</style>
-""", unsafe_allow_html=True)
-
 
 # Show title and description.
 # Add a radio button for mode selection
@@ -374,16 +352,13 @@ else:
     )
 
     def format_ai_response(response):
-        # Remove any existing HTML tags that might interfere with markdown rendering
-        response = re.sub(r'<[^>]+>', '', response)
+        # Remove custom code block formatting
+        formatted_response = re.sub(r'```(.*?)```', r'```\1```', response, flags=re.DOTALL)
         
-        # Ensure code blocks are properly formatted for markdown
-        response = re.sub(r'```(\w+)?\n(.*?)```', r'```\1\n\2\n```', response, flags=re.DOTALL)
+        # Remove custom inline code formatting
+        formatted_response = re.sub(r'`([^`\n]+)`', r'`\1`', formatted_response)
         
-        # Ensure inline code is properly formatted
-        response = re.sub(r'`([^`\n]+)`', r'`\1`', response)
-        
-        return response
+        return formatted_response
         
     async def run_github_editor(query: str, thread_id: str = "default"):
         inputs = {"messages": [HumanMessage(content=query)]}
@@ -412,17 +387,14 @@ else:
                         full_response += text
                     else:
                         full_response += content
-                    
-                    formatted_response = format_ai_response(full_response)
-                    response_container.markdown(formatted_response)
+                    response_container.markdown(format_ai_response(full_response))
             elif kind == "on_tool_start" and mode == "Task":
                 response_container.write(f"\nUsing tool: {event['name']}")
             elif kind == "on_tool_end" and mode == "Task":
                 response_container.write(f"Tool result: {event['data']['output']}\n")
     
-        # Final formatted response
-        final_formatted_response = format_ai_response(full_response)
-        response_container.markdown(final_formatted_response)
+        # Update the final response using Streamlit's markdown
+        response_container.markdown(format_ai_response(full_response))
 
     # Create a session state variable to store the chat messages. This ensures that the
     # messages persist across reruns.
