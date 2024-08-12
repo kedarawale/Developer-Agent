@@ -17,6 +17,7 @@ from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_anthropic import ChatAnthropic
 from langchain_community.tools import ShellTool
 from langgraph.prebuilt import create_react_agent
+from langgraph.checkpoint.memory import MemorySaver
 
 st.markdown("""
 <style>
@@ -247,7 +248,6 @@ else:
     Given this context, provide direct answers to user questions based on the current state of the repository.
     Take a deep breath and think through the question step by step before answering:"""
 
-    from langgraph.checkpoint import MemorySaver
 
     memory = MemorySaver()
 
