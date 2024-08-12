@@ -21,25 +21,38 @@ from langgraph.prebuilt import create_react_agent
 st.markdown("""
 <style>
     .stCodeBlock {
-        background-color: #f0f0f0;
-        border: 1px solid #d0d0d0;
-        border-radius: 5px;
-        padding: 10px;
-        margin-bottom: 10px;
+        background-color: #f6f8fa;
+        border: 1px solid #e1e4e8;
+        border-radius: 6px;
+        padding: 16px;
+        position: relative;
     }
     .stCodeBlock pre {
         margin: 0;
+        padding: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
     }
     .copyButton {
         position: absolute;
         top: 5px;
         right: 5px;
         padding: 5px 10px;
-        background-color: #4CAF50;
+        background-color: #0366d6;
         color: white;
         border: none;
         border-radius: 3px;
         cursor: pointer;
+        font-size: 12px;
+    }
+    .copyButton:hover {
+        background-color: #0056b3;
+    }
+    code {
+        padding: 2px 4px;
+        background-color: #f6f8fa;
+        border-radius: 3px;
+        font-family: monospace;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -378,22 +391,35 @@ else:
     )
 
     def format_ai_response(response):
-        # Function to replace code blocks with formatted versions
         def replace_code_block(match):
             code = match.group(1).strip()
-            # Remove language specifier if present
             code = re.sub(r'^(python|typescript|javascript)\n', '', code, flags=re.IGNORECASE)
-            return f"\n```\n{code}\n```\n"
+            return f'<div class="stCodeBlock"><button class="copyButton" onclick="copyCode(this)">Copy</button><pre><code>{code}</code></pre></div>'
     
-        # Replace code blocks
         formatted_response = re.sub(r'```(.*?)```', replace_code_block, response, flags=re.DOTALL)
+        formatted_response = re.sub(r'`([^`\n]+)`', r'<code>\1</code>', formatted_response)
         
-        # Ensure proper formatting for file paths and inline code
-        formatted_response = re.sub(r'`([^`\n]+)`', r'`\1`', formatted_response)
+        # Add JavaScript for copy functionality
+        js = """
+        <script>
+        function copyCode(button) {
+            const pre = button.nextElementSibling;
+            const code = pre.querySelector('code');
+            const range = document.createRange();
+            range.selectNode(code);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+            document.execCommand('copy');
+            window.getSelection().removeAllRanges();
+            button.textContent = 'Copied!';
+            setTimeout(() => {
+                button.textContent = 'Copy';
+            }, 2000);
+        }
+        </script>
+        """
+        return js + formatted_response
         
-        return formatted_response
-        
-        return formatted_response
     async def run_github_editor(query: str, thread_id: str = "default"):
         inputs = {"messages": [HumanMessage(content=query)]}
         config = {
